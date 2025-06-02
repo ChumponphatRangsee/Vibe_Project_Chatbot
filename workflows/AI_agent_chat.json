@@ -1,0 +1,582 @@
+{
+  "name": "AI agent chat",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -1360,
+        680
+      ],
+      "id": "29248641-a5d1-42d4-b4c3-585d8be47f98",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "= SELECT question, answer, topic FROM faqs \nWHERE topic ILIKE '{{$json[\"output\"]}}' \nLIMIT 1;\n",
+        "additionalFields": {}
+      },
+      "id": "92eb5709-dfd6-4975-adad-ea2dd5e6aafd",
+      "name": "Search FAQ",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -1080,
+        440
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "credentials": {
+        "postgres": {
+          "id": "HcMp39iqfHAxWnSU",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [],
+          "string": [
+            {
+              "value1": "={{$json[\"answer\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "18285f6c-0057-4a7d-8675-1e033723f4fe",
+      "name": "FAQ Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT DISTINCT topic FROM faqs ORDER BY topic;",
+        "additionalFields": {}
+      },
+      "id": "a851f2d5-5be5-4b82-8414-aad0e9ca541d",
+      "name": "Get Topics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -340,
+        620
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "HcMp39iqfHAxWnSU",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const topics = [\n  \"Shipping & Delivery\",\n  \"Returns & Refunds\",\n  \"Payment Options\"\n];\n\nconst blocks = topics.map(topic => {\n  return {\n    type: \"box\",\n    text: topic,\n    action: {\n      type: \"send_message\",\n      message: topic\n    }\n  };\n});\n\nreturn [{\n  json: {\n    text: \"Sorry, I couldn't find an answer. Please select a topic:\",\n    blocks: blocks\n  }\n}];"
+      },
+      "id": "a455d6ae-808d-4f1a-a06f-5e1ef4c7bf80",
+      "name": "Format Topics as Buttons",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseKey": "answer"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -80,
+        420
+      ],
+      "id": "c0aa3b71-f3f3-441e-bc5a-07d425f02318",
+      "name": "Respond to Webhook",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        620
+      ],
+      "id": "3fa6f99a-b461-4347-9d69-504309205962",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "7f46f62e-12d6-40b5-91b2-d849c00320fe",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -1540,
+        680
+      ],
+      "typeVersion": 1,
+      "credentials": {
+        "openAiApi": {
+          "id": "plLcvv2UWU9qivEj",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an assistant for customers at AchaDirect, a wholesale body jewelry company. Given a user message, return only one of the following predefined topics that best matches the user's intent:\n\n- Contact Information  \n- Communication  \n- Product Quality  \n- Pricing & Currency  \n- Order Requirements  \n- Discounts & Promotions  \n- Payment Options  \n- Product Sampling  \n- Shipping & Delivery  \n- Trade Terms  \n- Taxes & Import Fees  \n- Returns & Refunds\n\nIf none of the topics match the user's message, respond with exactly: No intent matched\n\nMessage: \"{{ $json.body.chatInput }}\"\n\nOnly respond with the matching topic name, or \"No intent matched\" if there is no relevant intent.",
+        "options": {}
+      },
+      "id": "d6a3ce04-11d1-442e-af15-351652e57561",
+      "name": "AI Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -1480,
+        440
+      ],
+      "typeVersion": 1.6
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      text: $json.answer\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -340,
+        420
+      ],
+      "id": "97c343a3-fc71-4d69-b83c-89aabc599417",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chat",
+        "responseMode": "lastNode",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "a3df8ab6-a255-4263-ba89-782ba45ca2b4",
+      "name": "Webhook - Chat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -2940,
+        440
+      ],
+      "webhookId": "5efe0794-798c-47b1-b22d-8510a26048c2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO chat_sessions (session_id, message, sender) VALUES ('{{$json[\"sessionId\"]}}', '{{$json[\"answer\"]}}', 'bot');",
+        "additionalFields": {}
+      },
+      "name": "Log Bot Response1",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -860,
+        440
+      ],
+      "id": "fbdd3687-5332-482b-970f-05c68c006ec0",
+      "credentials": {
+        "postgres": {
+          "id": "HcMp39iqfHAxWnSU",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2960,
+        220
+      ],
+      "id": "16f2b9a6-032e-46a9-a1df-85708c8d5fb8",
+      "name": "When chat message received",
+      "webhookId": "f630bf96-a2f0-470d-ad25-95ce94f8242e"
+    },
+    {
+      "parameters": {
+        "mode": "combineBySql"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -1680,
+        440
+      ],
+      "id": "35ad7169-cd40-4906-8165-4b66f217b7d8",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "= SELECT session_id FROM chat_sessions\nWHERE session_id = '{{ $json.body.sessionId }}';\n",
+        "additionalFields": {}
+      },
+      "name": "Check Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -2660,
+        440
+      ],
+      "id": "532fca12-6c3f-4c2a-834e-e59523c15a29",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "HcMp39iqfHAxWnSU",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO chat_sessions (session_id, user_id, started_at)\nVALUES ('{{ $json.body.sessionId }}', '{{ $json.body.sender }}', NOW());\n",
+        "additionalFields": {}
+      },
+      "name": "Insert New Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -2060,
+        80
+      ],
+      "id": "666fee6f-7b26-4690-b29d-61977c6f2672",
+      "credentials": {
+        "postgres": {
+          "id": "HcMp39iqfHAxWnSU",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO chat_messages (session_id, sender, message, timestamp)\nVALUES (\n  '{{ $json.body.sessionId }}',\n  '{{ $json.body.sender }}',\n  '{{ $json.body.chatInput }}',\n  NOW()\n);",
+        "additionalFields": {}
+      },
+      "name": "Insert Chat Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -2060,
+        260
+      ],
+      "id": "9ea1d67f-eb22-494f-9e20-7b109b5338fa",
+      "credentials": {
+        "postgres": {
+          "id": "HcMp39iqfHAxWnSU",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $item(\"0\").$node[\"Check Session\"].json }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "empty",
+                      "singleValue": true
+                    },
+                    "id": "b4987cf1-b1c7-4b3c-95ff-6ccc222dca14"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "TRUE"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8a5f2f86-3376-40a5-8905-51c300f23fde",
+                    "leftValue": "={{ $item(\"0\").$node[\"Check Session\"].json }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "FALSE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -2400,
+        440
+      ],
+      "id": "787b6b3a-4f46-429a-9a17-d127ff0e7583",
+      "name": "session doesn't exist"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search FAQ": {
+      "main": [
+        [
+          {
+            "node": "Log Bot Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FAQ Found?": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Topics": {
+      "main": [
+        [
+          {
+            "node": "Format Topics as Buttons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Topics as Buttons": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Search FAQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook1": {
+      "main": [
+        []
+      ]
+    },
+    "Webhook - Chat": {
+      "main": [
+        [
+          {
+            "node": "Check Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Bot Response1": {
+      "main": [
+        [
+          {
+            "node": "FAQ Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        []
+      ]
+    },
+    "Check Session": {
+      "main": [
+        [
+          {
+            "node": "session doesn't exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert New Session": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Chat Message": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "session doesn't exist": {
+      "main": [
+        [
+          {
+            "node": "Insert New Session",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert Chat Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "c7630621-eed1-40ab-802f-3e0a0b4c58b4",
+  "meta": {
+    "templateId": "1954",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1bbb0955b78ce983a82bc84ec0248bb241112ea4b132a3abd83951596825e202"
+  },
+  "id": "8dlaG2bsd60dyNa8",
+  "tags": []
+}
